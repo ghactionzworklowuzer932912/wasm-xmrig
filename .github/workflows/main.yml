@@ -1,14 +1,18 @@
 name: Deploy WebAssembly Monero Miner to GitHub Pages
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: write
   pages: write
+
 env:
   BOOST_VERSION: 1.76.0
   EMSDK_VERSION: 3.1.71
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -22,12 +26,15 @@ jobs:
         version: ${{ env.EMSDK_VERSION }}
         actions-cache-folder: 'emsdk-cache'
 
-    - name: Install dependencies
+    - name: Verify Emscripten setup
       run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential
+        emcc --version
+        which emcc
+        echo $EMSDK
+        ls -l $EMSDK/upstream/emscripten
 
     - name: Cache Boost
+      id: cache-boost
       uses: actions/cache@v3
       with:
         path: ~/boost
@@ -42,19 +49,21 @@ jobs:
         ./bootstrap.sh --prefix=$HOME/boost
         ./b2 install --with-system --with-filesystem --with-thread --with-date_time --with-chrono --with-regex --with-serialization --with-program_options
 
+    - name: Setup build environment
+      run: |
+        echo "BOOST_ROOT=$HOME/boost" >> $GITHUB_ENV
+        echo "CXXFLAGS=-I$HOME/boost/include -I$EMSDK/upstream/emscripten/system/include" >> $GITHUB_ENV
+        echo "LDFLAGS=-L$HOME/boost/lib" >> $GITHUB_ENV
+
     - name: Debug information
       run: |
-        emcc --version
+        echo "BOOST_ROOT: $BOOST_ROOT"
+        echo "CXXFLAGS: $CXXFLAGS"
+        echo "LDFLAGS: $LDFLAGS"
         ls -R $HOME/boost
-        echo $BOOST_ROOT
-        echo $CXXFLAGS
-        echo $LDFLAGS
 
     - name: Build WebAssembly miner
       run: |
-        export BOOST_ROOT=$HOME/boost
-        export CXXFLAGS="-I$BOOST_ROOT/include -I$EMSDK/upstream/emscripten/system/include"
-        export LDFLAGS="-L$BOOST_ROOT/lib"
         make TYPE=release
 
     - name: List build directory
