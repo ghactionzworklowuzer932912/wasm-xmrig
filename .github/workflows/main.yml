@@ -3,7 +3,8 @@ name: Deploy WebAssembly Monero Miner to GitHub Pages
 on:
   push:
     branches:
-      - main  # Adjust this if your default branch has a different name
+      - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -24,6 +25,9 @@ jobs:
       run: |
         make TYPE=release
 
+    - name: List build directory
+      run: ls -R build/release
+
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
@@ -37,8 +41,9 @@ jobs:
 
     - name: Update README with deployment info
       run: |
-        echo -e "\n## Deployment\nThis project is automatically deployed to GitHub Pages on each push to the main branch. You can access the live version at https://<username>.github.io/<repository-name>/" >> README.md
+        echo -e "\n## Deployment\nThis project is automatically deployed to GitHub Pages on each push to the main branch. You can access the live version at https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/" >> README.md
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git commit -am "Update README with deployment info"
+        git add README.md
+        git commit -m "Update README with deployment info" || echo "No changes to commit"
         git push
