@@ -2,16 +2,22 @@ name: Deploy WebAssembly Monero Miner to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+env:
+  BOOST_VERSION: 1.76.0
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Setup Emscripten
       uses: mymindstorm/setup-emsdk@v11
@@ -19,24 +25,40 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential
+        sudo apt-get install -y build-essential libboost-all-dev
 
-    - name: Setup Boost
+    - name: Cache Boost
+      uses: actions/cache@v3
+      with:
+        path: /usr/include/boost
+        key: ${{ runner.os }}-boost-${{ env.BOOST_VERSION }}
+
+    - name: Debug information
       run: |
-        wget https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.gz
-        tar xzf boost_1_76_0.tar.gz
-        cd boost_1_76_0
-        ./bootstrap.sh --prefix=/usr/local
-        sudo ./b2 install --with-system --with-filesystem --with-thread --with-date_time --with-chrono --with-regex --with-serialization --with-program_options
+        ls -R /usr/include/boost
+        echo $BOOST_ROOT
+        echo $CXXFLAGS
+        echo $LDFLAGS
+
+    - name: Update include paths
+      run: |
+        sed -i 's#<boost/#</usr/include/boost/#g' src/crypto/hash.h
 
     - name: Build WebAssembly miner
       run: |
         emcc --version
         ls -R
-        make TYPE=release BOOST_ROOT=/usr/local/include LDFLAGS="-L/usr/local/lib"
+        make TYPE=release BOOST_ROOT=/usr/include/boost CXXFLAGS="-I/usr/include" LDFLAGS="-L/usr/lib/x86_64-linux-gnu"
+      continue-on-error: false
 
     - name: List build directory
       run: ls -R build/release
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: wasm-miner
+        path: build/release
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
@@ -49,11 +71,13 @@ jobs:
         user_email: 'github-actions[bot]@users.noreply.github.com'
         commit_message: 'Deploy WebAssembly Monero Miner to GitHub Pages'
 
-    - name: Update README with deployment info
+    - name: Update README
       run: |
-        echo -e "\n## Deployment\nThis project is automatically deployed to GitHub Pages on each push to the main branch. You can access the live version at https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/" >> README.md
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add README.md
-        git commit -m "Update README with deployment info" || echo "No changes to commit"
-        git push
+        if ! grep -q "## Deployment" README.md; then
+          echo -e "\n## Deployment\nThis project is automatically deployed to GitHub Pages on each push to the main branch. You can access the live version at https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/" >> README.md
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add README.md
+          git commit -m "Update README with deployment info"
+          git push
+        fi
