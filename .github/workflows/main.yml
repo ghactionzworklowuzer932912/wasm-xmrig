@@ -7,16 +7,11 @@ on:
   pull_request:
     branches:
       - main
-  # Manually triggered workflows for redeployment
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [16.x]
 
     steps:
     # Checkout the repository
@@ -33,14 +28,13 @@ jobs:
         source ./emsdk_env.sh
         cd ..
 
-    # Build project with Emscripten
-    - name: Build with Emscripten
+    # Build using emmake instead of emcmake (no CMakeLists.txt needed)
+    - name: Build with Emscripten (emmake)
       run: |
         source emsdk/emsdk_env.sh
-        emcmake cmake .
         emmake make
 
-    # Capture the build files that will be used for deployment (e.g., .html, .js, .wasm)
+    # Prepare deployment folder
     - name: Prepare deployment folder
       run: |
         mkdir -p deploy
@@ -48,7 +42,7 @@ jobs:
         cp *.wasm deploy/
         if [ -f index.html ]; then cp index.html deploy/; fi
 
-    # Upload build artifacts (optionally for checkout and debugging)
+    # Upload build artifacts (optional for debugging)
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v3
       with:
@@ -56,15 +50,15 @@ jobs:
         path: deploy
 
   deploy:
-    needs: build         # Depends on the build job finishing successfully
+    needs: build         # Must run after build
     runs-on: ubuntu-latest
     permissions:
-      contents: write     # Access to the repository's `gh-pages` branch
-      pages: write        # Permission to update GitHub Pages
-      id-token: write     # Grants access to OIDC token for deployment creds
+      contents: write
+      pages: write
+      id-token: write
 
     steps:
-    # Checkout the branch and deploy files
+    # Checkout the branch for deployment
     - name: Checkout code
       uses: actions/checkout@v3
 
@@ -72,5 +66,4 @@ jobs:
     - name: Deploy to GitHub Pages
       uses: actions/deploy-pages@v2
       with:
-        # The directory that contains pre-made web content (from the "build" job)
         folder: deploy
