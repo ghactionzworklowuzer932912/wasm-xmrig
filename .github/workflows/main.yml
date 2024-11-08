@@ -7,7 +7,7 @@ permissions:
   contents: write
   pages: write
 env:
-  BOOST_VERSION: 1.76.0
+  BOOST_VERSION: 1.81.0
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -31,8 +31,8 @@ jobs:
       if: steps.cache-boost.outputs.cache-hit != 'true'
       run: |
         mkdir -p ~/boost_emscripten
-        wget https://github.com/emscripten-ports/boost/releases/download/boost-${{ env.BOOST_VERSION }}/boost-${{ env.BOOST_VERSION }}.tar.gz || exit 1
-        tar -xzf boost-${{ env.BOOST_VERSION }}.tar.gz -C ~/boost_emscripten || exit 1
+        wget https://boostorg.jfrog.io/artifactory/main/release/${{ env.BOOST_VERSION }}/source/boost_${{{ env.BOOST_VERSION }}_0.tar.gz || exit 1
+        tar -xzf boost_${{{ env.BOOST_VERSION }}_0.tar.gz -C ~/boost_emscripten --strip-components=1 || exit 1
     - name: Debug information
       run: |
         emcc --version
