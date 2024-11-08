@@ -1,69 +1,25 @@
-name: WASM Build and Deploy
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:
+      - main  # Set this to your default branch
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    # Checkout the repository
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    # Install the Emscripten SDK
-    - name: Install Emscripten SDK
-      run: |
-        git clone https://github.com/emscripten-core/emsdk.git
-        cd emsdk
-        ./emsdk install latest
-        ./emsdk activate latest
-        source ./emsdk_env.sh
-        cd ..
-
-    # Build using emmake instead of emcmake (no CMakeLists.txt needed)
-    - name: Build with Emscripten (emmake)
-      run: |
-        source emsdk/emsdk_env.sh
-        emmake make
-
-    # Prepare deployment folder
-    - name: Prepare deployment folder
-      run: |
-        mkdir -p deploy
-        cp *.js deploy/
-        cp *.wasm deploy/
-        if [ -f index.html ]; then cp index.html deploy/; fi
-
-    # Upload build artifacts (optional for debugging)
-    - name: Upload Build Artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: deploy
-        path: deploy
-
   deploy:
-    needs: build         # Must run after build
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-
     steps:
-    # Checkout the branch for deployment
-    - name: Checkout code
-      uses: actions/checkout@v3
+    - uses: actions/checkout@v2
 
-    # Deploy to GitHub Pages
+    - name: Set up Emscripten
+      uses: mymindstorm/setup-emsdk@v11
+
+    - name: Build project
+      run: |
+        make TYPE=release
+
     - name: Deploy to GitHub Pages
-      uses: actions/deploy-pages@v2
+      uses: peaceiris/actions-gh-pages@v3
       with:
-        folder: deploy
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./build/release  # Adjust this to your build output directory
