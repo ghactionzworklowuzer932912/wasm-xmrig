@@ -1,20 +1,26 @@
-name: Deploy to GitHub Pages
+name: Deploy WebAssembly Monero Miner to GitHub Pages
 
 on:
   push:
     branches:
-      - main  # Set this to your default branch
+      - main  # Adjust this if your default branch has a different name
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-    - name: Set up Emscripten
+    - name: Setup Emscripten
       uses: mymindstorm/setup-emsdk@v11
 
-    - name: Build project
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+
+    - name: Build WebAssembly miner
       run: |
         make TYPE=release
 
@@ -22,4 +28,17 @@ jobs:
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./build/release  # Adjust this to your build output directory
+        publish_dir: ./build/release
+        publish_branch: gh-pages
+        keep_files: true
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        commit_message: 'Deploy WebAssembly Monero Miner to GitHub Pages'
+
+    - name: Update README with deployment info
+      run: |
+        echo -e "\n## Deployment\nThis project is automatically deployed to GitHub Pages on each push to the main branch. You can access the live version at https://<username>.github.io/<repository-name>/" >> README.md
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -am "Update README with deployment info"
+        git push
