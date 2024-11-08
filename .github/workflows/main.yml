@@ -26,38 +26,41 @@ jobs:
         version: ${{ env.EMSDK_VERSION }}
         actions-cache-folder: 'emsdk-cache'
 
-    - name: Cache Boost
+    - name: Cache Boost for Emscripten
       id: cache-boost
       uses: actions/cache@v3
       with:
-        path: ~/boost_install
-        key: ${{ runner.os }}-boost-${{ env.BOOST_VERSION }}
+        path: ~/boost_emscripten
+        key: ${{ runner.os }}-boost-emscripten-${{ env.BOOST_VERSION }}
 
-    - name: Build Boost
+    - name: Download and Extract Boost for Emscripten
       if: steps.cache-boost.outputs.cache-hit != 'true'
       run: |
-        wget https://boostorg.jfrog.io/artifactory/main/release/${{ env.BOOST_VERSION }}/source/boost_${BOOST_VERSION//./_}.tar.gz
-        tar xzf boost_${BOOST_VERSION//./_}.tar.gz
-        cd boost_${BOOST_VERSION//./_}
-        ./bootstrap.sh --prefix=$HOME/boost_install
-        ./b2 --with-system --with-filesystem --with-thread --with-date_time --with-chrono --with-regex --with-serialization --with-program_options toolset=emscripten link=static threading=multi runtime-link=static
-        ./b2 install --prefix=$HOME/boost_install
+        mkdir -p ~/boost_emscripten
+        wget https://github.com/emscripten-ports/boost/releases/download/boost-${{ env.BOOST_VERSION }}/boost-${{ env.BOOST_VERSION }}.tar.gz
+        tar -xzf boost-${{ env.BOOST_VERSION }}.tar.gz -C ~/boost_emscripten
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
 
     - name: Debug information
       run: |
         emcc --version
-        ls -R $HOME/boost_install
-        echo $BOOST_ROOT
-        echo $CXXFLAGS
-        echo $LDFLAGS
+        ls -R ~/boost_emscripten
+        echo "BOOST_ROOT=$HOME/boost_emscripten"
+        echo "EMSDK=$EMSDK"
 
     - name: Build WebAssembly miner
       run: |
-        export BOOST_ROOT=$HOME/boost_install
+        export BOOST_ROOT=$HOME/boost_emscripten
         export CXXFLAGS="-I$BOOST_ROOT/include -I$EMSDK/upstream/emscripten/system/include"
         export LDFLAGS="-L$BOOST_ROOT/lib"
         emcc --clear-cache
         make TYPE=release BOOST_ROOT=$BOOST_ROOT CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS"
+      env:
+        EMCC_FORCE_STDLIBS: 1
 
     - name: List build directory
       run: ls -R build/release
